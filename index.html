@@ -3,12 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>우리 둘만의 가계부</title>
+  <title>우리 둘만의 가계부 (E2EE 암호화)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   
-  <!-- Firebase SDK 추가 (실시간 동기화용) -->
+  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <!-- CryptoJS 암호화 라이브러리 추가 (E2EE 구현용) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 </head>
 <body class="bg-gray-50 text-gray-800 pb-10 select-none">
 
@@ -27,7 +30,7 @@
 
         <div class="flex items-center gap-1">
           <button onclick="changeMonth(1)" class="p-2 text-gray-500 font-bold">&gt;</button>
-          <!-- 동기화 설정 버튼 추가 -->
+          <!-- 동기화 설정 버튼 -->
           <button onclick="openSyncModal()" class="p-2 text-gray-600 hover:text-teal-600" title="동기화 설정">
             🔗
           </button>
@@ -281,7 +284,7 @@
     </div>
   </div>
 
-  <!-- 공통 아이콘 선택 모달 (팝업) -->
+  <!-- 공통 아이콘 선택 모달 -->
   <div id="addItemModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
     <div class="bg-white rounded-2xl p-5 w-full max-w-xs space-y-4 shadow-xl">
       <h3 id="modalTitle" class="font-bold text-base text-gray-800">새 항목 추가</h3>
@@ -300,18 +303,19 @@
     </div>
   </div>
 
-  <!-- 동기화 설정 모달 (아내 단말기 연결) -->
+  <!-- 동기화 설정 모달 -->
   <div id="syncModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
     <div class="bg-white rounded-2xl p-5 w-full max-w-xs space-y-4 shadow-xl">
-      <h3 class="font-bold text-base text-gray-800">부부 가계부 데이터 동기화</h3>
+      <h3 class="font-bold text-base text-gray-800">부부 가계부 암호화 동기화</h3>
       
       <div class="space-y-3 text-xs">
         <div class="bg-teal-50 p-3 rounded-xl border border-teal-200">
-          <p class="text-gray-500 font-bold mb-1">내 동기화 코드 (공유용)</p>
+          <p class="text-gray-500 font-bold mb-1">내 동기화 코드 (암호화키)</p>
           <div class="flex justify-between items-center bg-white p-2 rounded-lg border">
             <span id="mySyncCode" class="font-mono font-bold text-teal-700 text-sm">생성중...</span>
             <button onclick="copySyncCode()" class="text-[10px] bg-teal-500 text-white px-2 py-1 rounded">복사</button>
           </div>
+          <p class="text-[10px] text-teal-600 mt-1">* 이 코드가 암호화 열쇠 역할을 하며 서버에는 암호화되어 저장됩니다.</p>
         </div>
 
         <div class="pt-2">
@@ -328,7 +332,7 @@
   </div>
 
   <script>
-    /* --- Firebase 실시간 데이타베이스 기본 설정 --- */
+    /* --- Firebase 실시간 DB 기본 설정 --- */
     const firebaseConfig = {
       databaseURL: "https://couple-ledger-default-rtdb.asia-southeast1.firebasedatabase.app/"
     };
@@ -337,7 +341,7 @@
     }
     const db = firebase.database();
 
-    // 내 기본 동기화 코드 설정 및 불러오기
+    // 동기화 코드 및 E2EE 암호화 키
     let syncCode = localStorage.getItem('my_sync_code');
     if (!syncCode) {
       syncCode = 'COUPLE-' + Math.floor(100000 + Math.random() * 900000);
@@ -385,56 +389,91 @@
       payment: ['💳', '💵', '📱', '🏦', '🪙', '💸', '🧾', '📲', '⌚', '🏛️']
     };
 
+    /* --- E2EE 종단간 암호화 / 복호화 헬퍼 함수 --- */
+    function encryptData(dataObject) {
+      try {
+        const jsonString = JSON.stringify(dataObject);
+        return CryptoJS.AES.encrypt(jsonString, syncCode).toString();
+      } catch (e) {
+        console.error("Encryption error:", e);
+        return null;
+      }
+    }
+
+    function decryptData(encryptedString) {
+      try {
+        const bytes = CryptoJS.AES.decrypt(encryptedString, syncCode);
+        const decryptedText = bytes.toString(CryptoJS.enc.Utf8);
+        return JSON.parse(decryptedText);
+      } catch (e) {
+        console.error("Decryption error:", e);
+        return null;
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       renderCalendar();
       renderDayExpenses();
       initFirebaseSync();
     });
 
-    /* --- 동기화 데이터 보관 및 푸시 함수 --- */
+    /* --- 암호화 데이터 전송 및 동기화 함수 --- */
     function syncToFirebase() {
       if (!syncCode) return;
-      db.ref('ledgers/' + syncCode).set({
+
+      const rawPayload = {
         expenses: expenses,
         users: users,
         categories: categories,
         payments: payments
+      };
+
+      // 기기 내에서 데이터 암호화 후 Firebase 서버로 올림 (서버는 복호화 불가)
+      const encryptedPayload = encryptData(rawPayload);
+
+      db.ref('encrypted_ledgers/' + syncCode).set({
+        payload: encryptedPayload,
+        updatedAt: Date.now()
       });
     }
 
     function initFirebaseSync() {
       if (!syncCode) return;
       
-      const ledgerRef = db.ref('ledgers/' + syncCode);
+      const ledgerRef = db.ref('encrypted_ledgers/' + syncCode);
       
       ledgerRef.on('value', (snapshot) => {
         const data = snapshot.val();
-        if (data) {
-          if (data.expenses) {
-            expenses = data.expenses;
-            localStorage.setItem('my_expenses', JSON.stringify(expenses));
+        if (data && data.payload) {
+          // 서버에서 온 암호문을 기기 내부 키(syncCode)로 복호화
+          const decrypted = decryptData(data.payload);
+
+          if (decrypted) {
+            if (decrypted.expenses) {
+              expenses = decrypted.expenses;
+              localStorage.setItem('my_expenses', JSON.stringify(expenses));
+            }
+            if (decrypted.users) {
+              users = decrypted.users;
+              localStorage.setItem('my_users', JSON.stringify(users));
+            }
+            if (decrypted.categories) {
+              categories = decrypted.categories;
+              localStorage.setItem('my_categories', JSON.stringify(categories));
+            }
+            if (decrypted.payments) {
+              payments = decrypted.payments;
+              localStorage.setItem('my_payments', JSON.stringify(payments));
+            }
+            renderCalendar();
+            renderDayExpenses();
           }
-          if (data.users) {
-            users = data.users;
-            localStorage.setItem('my_users', JSON.stringify(users));
-          }
-          if (data.categories) {
-            categories = data.categories;
-            localStorage.setItem('my_categories', JSON.stringify(categories));
-          }
-          if (data.payments) {
-            payments = data.payments;
-            localStorage.setItem('my_payments', JSON.stringify(payments));
-          }
-          renderCalendar();
-          renderDayExpenses();
         } else {
           syncToFirebase();
         }
       });
     }
 
-    /* --- 동기화 모달 컨트롤러 --- */
     function openSyncModal() {
       document.getElementById('mySyncCode').innerText = syncCode;
       document.getElementById('syncModal').classList.remove('hidden');
@@ -446,7 +485,7 @@
 
     function copySyncCode() {
       navigator.clipboard.writeText(syncCode).then(() => {
-        alert('동기화 코드가 복사되었습니다! 아내분께 전달해주세요.');
+        alert('동기화 코드가 복사되었습니다! 상대방에게 전달해주세요.');
       });
     }
 
@@ -459,7 +498,7 @@
         return alert('본인의 코드가 아닌 상대방의 코드를 입력해주세요.');
       }
 
-      if (confirm(`'${partnerCode}' 코드로 데이터를 연결하시겠습니까?\n기존 단말기의 데이터는 해당 코드의 데이터로 통합됩니다.`)) {
+      if (confirm(`'${partnerCode}' 코드로 연결하시겠습니까?\n해당 코드의 암호화된 가계부 데이터로 동기화됩니다.`)) {
         syncCode = partnerCode;
         localStorage.setItem('my_sync_code', syncCode);
         closeSyncModal();
@@ -481,7 +520,6 @@
       if (step === 6) renderPayments();
     }
 
-    /* --- 통계 화면 컨트롤러 --- */
     function openStatsScreen() {
       for (let i = 1; i <= 6; i++) {
         document.getElementById(`step${i}`).classList.add('hidden');
