@@ -6,65 +6,119 @@
   <title>부부 실시간 공유 가계부</title>
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <style>
-    :root { --primary: #4f46e5; --bg: #f8fafc; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); margin: 0; padding: 16px; color: #334155; }
-    .container { max-width: 500px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
-    .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    h2, h3 { margin: 0 0 12px 0; font-size: 1.1rem; }
-    input, select, button { width: 100%; padding: 10px; margin-top: 6px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; }
-    button { background: var(--primary); color: white; border: none; font-weight: bold; cursor: pointer; }
-    button:hover { opacity: 0.9; }
-    .status-badge { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold; background: #e2e8f0; color: #64748b; }
+    :root {
+      --primary: #6366f1;
+      --primary-dark: #4f46e5;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #1e293b;
+      --income: #2563eb;
+      --expense: #e11d48;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 16px; }
+    .container { max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+    .header { text-align: center; margin-bottom: 8px; }
+    .header h1 { font-size: 1.4rem; margin: 0; color: var(--primary-dark); }
+    .card { background: var(--card-bg); padding: 18px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .section-title { font-size: 1rem; font-weight: bold; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+    .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; background: #e2e8f0; color: #64748b; }
     .status-badge.online { background: #dcfce7; color: #15803d; }
-    ul { list-style: none; padding: 0; margin: 0; }
-    li { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
-    .income { color: #2563eb; font-weight: bold; }
-    .expense { color: #dc2626; font-weight: bold; }
-    .summary { display: flex; justify-content: space-between; margin-top: 10px; font-weight: bold; }
+    .input-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    .input-row { display: flex; gap: 8px; }
+    input, select { padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; width: 100%; box-sizing: border-box; }
+    button { background: var(--primary); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 0.95rem; cursor: pointer; transition: 0.2s; }
+    button:hover { background: var(--primary-dark); }
+    .btn-secondary { background: #64748b; }
+    .summary-box { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #f1f5f9; padding: 12px; border-radius: 10px; text-align: center; margin-bottom: 12px; }
+    .summary-item .label { font-size: 0.8rem; color: #64748b; }
+    .summary-item .val { font-weight: bold; font-size: 1.1rem; margin-top: 4px; }
+    .list-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
+    .list-item:last-child { border-bottom: none; }
+    .item-info .title { font-weight: bold; font-size: 0.95rem; }
+    .item-info .sub { font-size: 0.75rem; color: #94a3b8; margin-top: 2px; }
+    .amount { font-weight: bold; font-size: 1rem; }
+    .amount.income { color: var(--income); }
+    .amount.expense { color: var(--expense); }
+    .id-box { background: #eeef2; padding: 8px 12px; border-radius: 6px; font-family: monospace; font-size: 0.85rem; word-break: break-all; color: var(--primary-dark); font-weight: bold; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h2>💕 부부 실시간 공유 가계부</h2>
+    <div class="header">
+      <h1>💕 우리 부부 가계부</h1>
+    </div>
 
-    <!-- P2P 연결 세션 -->
+    <!-- P2P 동기화 -->
     <div class="card">
-      <h3>1. 실시간 동기화 (P2P)</h3>
-      <p style="font-size: 0.9rem; margin: 4px 0;">내 ID: <b id="my-id" style="color:var(--primary);">생성 중...</b></p>
-      <p style="font-size: 0.9rem; margin: 4px 0;">상태: <span id="status" class="status-badge">오프라인</span></p>
-      <input type="text" id="peer-id-input" placeholder="상대방 ID 입력">
-      <button onclick="connectToPeer()">연결하기</button>
+      <div class="section-title">
+        <span>🔗 실시간 P2P 연결</span>
+        <span id="status" class="status-badge">오프라인</span>
+      </div>
+      <div class="input-group">
+        <div style="margin-bottom: 6px;">내 ID: <span id="my-id" class="id-box">생성 중...</span></div>
+        <div class="input-row">
+          <input type="text" id="peer-id-input" placeholder="상대방 ID 입력">
+          <button style="width: 110px;" onclick="connectToPeer()">연결하기</button>
+        </div>
+      </div>
     </div>
 
     <!-- 내역 입력 -->
     <div class="card">
-      <h3>2. 내역 추가</h3>
-      <select id="type">
-        <option value="expense">지출</option>
-        <option value="income">수입</option>
-      </select>
-      <input type="text" id="desc" placeholder="내역 (예: 장보기, 월급)">
-      <input type="number" id="amount" placeholder="금액 (원)">
-      <button onclick="addRecord()">추가 및 동기화</button>
+      <div class="section-title">📝 내역 작성</div>
+      <div class="input-group">
+        <div class="input-row">
+          <select id="user-role" style="width: 40%;">
+            <option value="남편">남편</option>
+            <option value="아내">아내</option>
+          </select>
+          <select id="type" style="width: 60%;" onchange="updateCategories()">
+            <option value="expense">지출</option>
+            <option value="income">수입</option>
+          </select>
+        </div>
+        <div class="input-row">
+          <select id="category" style="width: 40%;">
+            <option value="식비">식비</option>
+            <option value="생필품">생필품</option>
+            <option value="교통/차량">교통/차량</option>
+            <option value="문화/여가">문화/여가</option>
+            <option value="기타">기타</option>
+          </select>
+          <input type="text" id="desc" placeholder="내역 입력" style="width: 60%;">
+        </div>
+        <input type="number" id="amount" placeholder="금액 (원)">
+      </div>
+      <button onclick="addRecord()">내역 추가 & 실시간 동기화</button>
     </div>
 
     <!-- 요약 및 목록 -->
     <div class="card">
-      <h3>3. 가계부 목록</h3>
-      <div class="summary">
-        <span>총 잔액: <span id="total-balance">0</span>원</span>
+      <div class="section-title">📊 이번 달 내역 목록</div>
+      <div class="summary-box">
+        <div class="summary-item">
+          <div class="label">총 수입</div>
+          <div class="val" style="color: var(--income);" id="total-income">0원</div>
+        </div>
+        <div class="summary-item">
+          <div class="label">총 지출</div>
+          <div class="val" style="color: var(--expense);" id="total-expense">0원</div>
+        </div>
       </div>
-      <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 12px 0;">
-      <ul id="record-list"></ul>
+      <div id="record-list"></div>
     </div>
   </div>
 
   <script>
-    let records = JSON.parse(localStorage.getItem('couple_records') || '[]');
+    const categories = {
+      expense: ['식비', '생필품', '교통/차량', '문화/여가', '경조사', '기타'],
+      income: ['월급', '부수입', '용돈', '기타']
+    };
+
+    let records = JSON.parse(localStorage.getItem('couple_records_v2') || '[]');
     let peer = new Peer();
     let conn = null;
 
-    // P2P 초기화
     peer.on('open', (id) => {
       document.getElementById('my-id').innerText = id;
     });
@@ -75,7 +129,7 @@
     });
 
     function connectToPeer() {
-      const peerId = document.getElementById('peer-id-input').value;
+      const peerId = document.getElementById('peer-id-input').value.trim();
       if (!peerId) return alert('상대방 ID를 입력해주세요.');
       conn = peer.connect(peerId);
       setupConnection();
@@ -86,36 +140,46 @@
         const statusEl = document.getElementById('status');
         statusEl.innerText = '연결됨';
         statusEl.classList.add('online');
-        // 연결 성공 시 현재 내 데이터 전체 전송
         conn.send({ type: 'SYNC_ALL', data: records });
       });
 
       conn.on('data', (data) => {
         if (data.type === 'NEW_RECORD') {
-          records.push(data.data);
+          records.unshift(data.data);
           saveAndRender();
         } else if (data.type === 'SYNC_ALL') {
-          // 데이터 합치기 (중복 제거)
           const merged = [...records, ...data.data];
           records = Array.from(new Set(merged.map(JSON.stringify))).map(JSON.parse);
+          records.sort((a, b) => b.id - a.id);
           saveAndRender();
         }
       });
     }
 
-    // 내역 추가
-    function addRecord() {
+    function updateCategories() {
       const type = document.getElementById('type').value;
-      const desc = document.getElementById('desc').value;
+      const catSelect = document.getElementById('category');
+      catSelect.innerHTML = categories[type].map(c => `<option value="${c}">${c}</option>`).join('');
+    }
+
+    function addRecord() {
+      const user = document.getElementById('user-role').value;
+      const type = document.getElementById('type').value;
+      const category = document.getElementById('category').value;
+      const desc = document.getElementById('desc').value.trim();
       const amount = Number(document.getElementById('amount').value);
 
       if (!desc || !amount) return alert('내용과 금액을 입력해주세요.');
 
-      const newRecord = { id: Date.now(), type, desc, amount };
-      records.push(newRecord);
+      const newRecord = {
+        id: Date.now(),
+        date: new Date().toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }),
+        user, type, category, desc, amount
+      };
+
+      records.unshift(newRecord);
       saveAndRender();
 
-      // P2P 전송
       if (conn && conn.open) {
         conn.send({ type: 'NEW_RECORD', data: newRecord });
       }
@@ -124,35 +188,46 @@
       document.getElementById('amount').value = '';
     }
 
-    // 저장 및 화면 갱신
     function saveAndRender() {
-      localStorage.setItem('couple_records', JSON.stringify(records));
+      localStorage.setItem('couple_records_v2', JSON.stringify(records));
       renderList();
     }
 
     function renderList() {
       const listEl = document.getElementById('record-list');
-      const totalEl = document.getElementById('total-balance');
+      const incEl = document.getElementById('total-income');
+      const expEl = document.getElementById('total-expense');
+
       listEl.innerHTML = '';
+      let incTotal = 0;
+      let expTotal = 0;
 
-      let total = 0;
+      if (records.length === 0) {
+        listEl.innerHTML = '<div style="text-align:center; padding: 20px; color: #94a3b8;">등록된 내역이 없습니다.</div>';
+      }
+
       records.forEach(r => {
-        const li = document.createElement('li');
-        const isIncome = r.type === 'income';
-        if (isIncome) total += r.amount;
-        else total -= r.amount;
+        if (r.type === 'income') incTotal += r.amount;
+        else expTotal += r.amount;
 
-        li.innerHTML = `
-          <span>${r.desc}</span>
-          <span class="${r.type}">${isIncome ? '+' : '-'}${r.amount.toLocaleString()}원</span>
+        const item = document.createElement('div');
+        item.className = 'list-item';
+        item.innerHTML = `
+          <div class="item-info">
+            <div class="title">[${r.category}] ${r.desc}</div>
+            <div class="sub">${r.date} · ${r.user}</div>
+          </div>
+          <div class="amount ${r.type}">
+            ${r.type === 'income' ? '+' : '-'}${r.amount.toLocaleString()}원
+          </div>
         `;
-        listEl.appendChild(li);
+        listEl.appendChild(item);
       });
 
-      totalEl.innerText = total.toLocaleString();
+      incEl.innerText = incTotal.toLocaleString() + '원';
+      expEl.innerText = expTotal.toLocaleString() + '원';
     }
 
-    // 초기 로드
     renderList();
   </script>
 </body>
