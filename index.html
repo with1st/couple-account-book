@@ -1125,7 +1125,7 @@
           <div onclick="selectDate('${dateString}')" class="p-1 flex flex-col items-center justify-center h-12 cursor-pointer">
             <span class="w-7 h-7 flex items-center justify-center text-xs ${dayClass}">${day}</span>
             <span class="text-[9px] text-red-500 font-medium truncate w-full ${dayExpense ? '' : 'hidden'}">
-              -${(dayExpense/10000).toFixed(0) > 0 ? (dayExpense/10000).toFixed(0) + '만' : dayExpense.toLocaleString()}
+              -${dayExpense >= 10000 ? Math.floor(dayExpense/10000) + '만' : dayExpense.toLocaleString()}
             </span>
           </div>
         `;
