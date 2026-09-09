@@ -3,6 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIuKamCDroI3tlZsg6rCA64OE67iEIiwKICAic2hvcnRfbmFtZSI6ICLroI3tlZsg6rCA64OE67iEIiwKICAic3RhcnRfdXJsIjogIi4vIiwKICAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwKICAiYmFja2dyb3VuZF9jb2xvcIjogIiNmZmZmZmYiLAogICJ0aGVtZV9jb2xvcIjogIiNmZmZmZmYiCiB9">
+
   <title>우리 둘만의 가계부 (E2EE 암호화)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   
@@ -691,7 +698,7 @@
 
         container.innerHTML += `
           <div class="flex flex-col items-center flex-1 h-full justify-end gap-1">
-            <span class="text-[9px] font-bold text-gray-500">${m.sum ? (m.sum / 10000).toFixed(0) + '만' : '0'}</span>
+            <span class="text-[9px] font-bold text-gray-500">${m.sum ? (Math.abs(m.sum) >= 10000 ? (m.sum / 10000).toFixed(0) + '만' : m.sum.toLocaleString()) : '0'}</span>
             <div class="w-5 rounded-t-md transition-all ${isCurrent ? 'bg-teal-500' : 'bg-gray-300'}" style="height: ${heightPercent}%;"></div>
             <span class="text-xs font-bold ${isCurrent ? 'text-teal-600' : 'text-gray-400'} mt-1">${m.label}</span>
           </div>
