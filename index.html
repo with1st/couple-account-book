@@ -917,8 +917,6 @@
       closeDatePickerModal();
     }
 
-
-
 function toggleUserDeleteMode() {
   isUserDeleteMode = !isUserDeleteMode;
   renderUsers();
@@ -1040,7 +1038,6 @@ function renderUsers() {
       form.amount = amt;
       goToStep(5);
     }
-let isCategoryDeleteMode = false;
 
 function toggleCategoryDeleteMode() {
   isCategoryDeleteMode = !isCategoryDeleteMode;
@@ -1062,31 +1059,44 @@ function moveCategoryOrder(idx, direction, event) {
   renderCategories();
 }
 
+let isCategoryDeleteMode = false;
+let categorySortableInstance = null;
+
+function toggleCategoryDeleteMode() {
+  isCategoryDeleteMode = !isCategoryDeleteMode;
+  renderCategories();
+}
+
 function renderCategories() {
   const grid = document.getElementById('categoryGrid');
   if (!grid) return;
 
+  // 기존 드래그 인스턴스 초기화
+  if (categorySortableInstance) {
+    categorySortableInstance.destroy();
+    categorySortableInstance = null;
+  }
+
   let itemsHtml = '';
 
   categories.forEach((c, idx) => {
-    // 편집 모드일 때만 ◀, ▶ 순서 이동 화살표와 ✕ 삭제 버튼 노출
-    const editControls = isCategoryDeleteMode ? `
-      <div class="absolute -top-2 right-1 flex items-center gap-1 z-10">
-        ${idx > 0 ? `<button onclick="moveCategoryOrder(${idx}, -1, event)" class="bg-gray-700 text-white rounded-full w-4 h-4 text-[9px] flex items-center justify-center shadow">◀</button>` : ''}
-        ${idx < categories.length - 1 ? `<button onclick="moveCategoryOrder(${idx}, 1, event)" class="bg-gray-700 text-white rounded-full w-4 h-4 text-[9px] flex items-center justify-center shadow">▶</button>` : ''}
-        <button onclick="deleteCategory(${idx}, event)" class="bg-red-500 text-white rounded-full w-4 h-4 text-[10px] flex items-center justify-center shadow font-bold ml-0.5">✕</button>
-      </div>
+    // 편집 모드일 때만 여유 있는 크기의 ✕ 삭제 버튼 표시
+    const deleteBtn = isCategoryDeleteMode ? `
+      <button onclick="deleteCategory(${idx}, event)" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs flex items-center justify-center shadow-md z-20 font-bold">✕</button>
     ` : '';
 
     const clickAction = isCategoryDeleteMode ? '' : `selectCategory('${c.name}')`;
-    const borderStyle = isCategoryDeleteMode ? 'border-indigo-200 bg-indigo-50/20' : 'border-gray-200 bg-white active:bg-gray-50';
+    const borderStyle = isCategoryDeleteMode 
+      ? 'border-2 border-teal-400 bg-teal-50/20 shadow' 
+      : 'border-gray-200 bg-white active:bg-gray-50';
 
     itemsHtml += `
-      <div class="relative group">
-        ${editControls}
+      <div class="relative select-none category-sortable-item" data-id="${idx}">
+        ${deleteBtn}
         <button onclick="${clickAction}" class="w-full p-3 rounded-2xl flex flex-col items-center justify-center gap-1 border ${borderStyle}">
-          <span class="text-2xl">${c.icon}</span>
-          <span class="text-xs font-bold text-gray-700">${c.name}</span>
+          <span class="text-2xl pointer-events-none">${c.icon}</span>
+          <span class="text-xs font-bold text-gray-700 pointer-events-none">${c.name}</span>
+          ${isCategoryDeleteMode ? '<span class="text-[9px] text-teal-600 font-medium pointer-events-none">꾹 눌러 이동</span>' : ''}
         </button>
       </div>
     `;
@@ -1100,13 +1110,35 @@ function renderCategories() {
   `;
 
   const editToggleBtn = `
-    <button onclick="toggleCategoryDeleteMode()" class="p-3 ${isCategoryDeleteMode ? 'bg-teal-50 border-2 border-teal-400 text-teal-600' : 'bg-gray-50 border-2 border-dashed border-gray-300 text-gray-500'} rounded-2xl flex flex-col items-center justify-center">
-      <span class="text-sm font-bold">${isCategoryDeleteMode ? '✓' : '⚙️'}</span>
-      <span class="text-xs font-bold">${isCategoryDeleteMode ? '완료' : '편집/정렬'}</span>
+    <button onclick="toggleCategoryDeleteMode()" class="p-3 ${isCategoryDeleteMode ? 'bg-teal-500 text-white shadow-md' : 'bg-gray-50 border-2 border-dashed border-gray-300 text-gray-500'} rounded-2xl flex flex-col items-center justify-center">
+      <span class="text-base font-bold">${isCategoryDeleteMode ? '✓' : '⚙️'}</span>
+      <span class="text-xs font-bold mt-1">${isCategoryDeleteMode ? '완료' : '편집/정렬'}</span>
     </button>
   `;
 
   grid.innerHTML = itemsHtml + addBtn + editToggleBtn;
+
+  // 편집 모드일 때만 꾹 눌러서 드래그 정렬 활성화
+  if (isCategoryDeleteMode && window.Sortable) {
+    categorySortableInstance = new Sortable(grid, {
+      draggable: '.category-sortable-item', // 카드 아이템만 이동 가능
+      animation: 200,
+      delay: 150, // 모바일 롱프레스 딜레이
+      delayOnTouchOnly: true,
+      onEnd: function () {
+        const itemEls = grid.querySelectorAll('.category-sortable-item');
+        const newCategories = [];
+        itemEls.forEach(el => {
+          const originalIdx = parseInt(el.getAttribute('data-id'));
+          newCategories.push(categories[originalIdx]);
+        });
+        categories = newCategories;
+        localStorage.setItem('my_categories', JSON.stringify(categories));
+        syncToFirebase();
+        renderCategories();
+      }
+    });
+  }
 }
     
 
@@ -1125,8 +1157,6 @@ function renderCategories() {
       form.category = cat;
       goToStep(6);
     }
-
-    let isPaymentEditMode = false;
 
 function togglePaymentEditMode() {
   isPaymentEditMode = !isPaymentEditMode;
@@ -1148,56 +1178,86 @@ function movePaymentOrder(idx, direction, event) {
   renderPayments();
 }
 
+let isPaymentEditMode = false;
+let paymentSortableInstance = null;
+
+function togglePaymentEditMode() {
+  isPaymentEditMode = !isPaymentEditMode;
+  renderPayments();
+}
+
 function renderPayments() {
   const grid = document.getElementById('paymentGrid');
   if (!grid) return;
 
+  // 기존 드래그 인스턴스 초기화
+  if (paymentSortableInstance) {
+    paymentSortableInstance.destroy();
+    paymentSortableInstance = null;
+  }
+
   let itemsHtml = '';
 
   payments.forEach((p, idx) => {
-    // 편집 모드일 때만 순서 이동 화살표(◀, ▶)와 삭제 버튼(✕) 표시
-    const editControls = isPaymentEditMode ? `
-      <div class="absolute -top-2 right-1 flex items-center gap-1 z-10">
-        ${idx > 0 ? `<button onclick="movePaymentOrder(${idx}, -1, event)" class="bg-gray-700 text-white rounded-full w-5 h-5 text-[10px] flex items-center justify-center shadow">◀</button>` : ''}
-        ${idx < payments.length - 1 ? `<button onclick="movePaymentOrder(${idx}, 1, event)" class="bg-gray-700 text-white rounded-full w-5 h-5 text-[10px] flex items-center justify-center shadow">▶</button>` : ''}
-        <button onclick="deletePayment(${idx}, event)" class="bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center shadow font-bold ml-0.5">✕</button>
-      </div>
+    // 편집 모드일 때만 ✕ 삭제 버튼 표시
+    const deleteBtn = isPaymentEditMode ? `
+      <button onclick="deletePayment(${idx}, event)" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs flex items-center justify-center shadow-md z-20 font-bold">✕</button>
     ` : '';
 
-    const clickAction = isPaymentEditMode 
-      ? '' 
-      : `saveExpense('${p.name}')`;
-
+    const clickAction = isPaymentEditMode ? '' : `saveExpense('${p.name}')`;
     const borderStyle = isPaymentEditMode 
-      ? 'border-indigo-200 bg-indigo-50/20' 
+      ? 'border-2 border-teal-400 bg-teal-50/20 shadow' 
       : 'border-gray-200 bg-white active:bg-gray-50';
 
     itemsHtml += `
-      <div class="relative group">
-        ${editControls}
-        <button onclick="${clickAction}" class="w-full p-5 rounded-2xl flex items-center justify-center gap-3 border shadow-sm ${borderStyle}">
-          <span class="text-2xl">${p.icon}</span>
-          <span class="font-bold text-sm text-gray-700">${p.name}</span>
+      <div class="relative select-none payment-sortable-item" data-id="${idx}">
+        ${deleteBtn}
+        <button onclick="${clickAction}" class="w-full p-4 rounded-2xl flex items-center justify-center gap-3 border ${borderStyle}">
+          <span class="text-2xl pointer-events-none">${p.icon}</span>
+          <span class="font-bold text-sm text-gray-700 pointer-events-none">${p.name}</span>
+          ${isPaymentEditMode ? '<span class="text-[10px] text-teal-600 font-medium ml-auto pointer-events-none">꾹 눌러 이동</span>' : ''}
         </button>
       </div>
     `;
   });
 
   const addBtn = `
-    <button onclick="openModal('payment')" class="p-5 bg-gray-50 border-2 border-dashed border-gray-300 rounded-2xl flex items-center justify-center gap-2">
+    <button onclick="openModal('payment')" class="p-4 bg-gray-50 border-2 border-dashed border-gray-300 rounded-2xl flex items-center justify-center gap-2">
       <span class="text-xl text-gray-400">+</span>
       <span class="text-xs font-bold text-gray-500">추가</span>
     </button>
   `;
 
   const editToggleBtn = `
-    <button onclick="togglePaymentEditMode()" class="p-5 ${isPaymentEditMode ? 'bg-teal-50 border-2 border-teal-400 text-teal-600' : 'bg-gray-50 border-2 border-dashed border-gray-300 text-gray-500'} rounded-2xl flex items-center justify-center gap-2">
-      <span class="text-sm font-bold">${isPaymentEditMode ? '✓' : '⚙️'}</span>
+    <button onclick="togglePaymentEditMode()" class="p-4 ${isPaymentEditMode ? 'bg-teal-500 text-white shadow-md' : 'bg-gray-50 border-2 border-dashed border-gray-300 text-gray-500'} rounded-2xl flex items-center justify-center gap-2">
+      <span class="text-base font-bold">${isPaymentEditMode ? '✓' : '⚙️'}</span>
       <span class="text-xs font-bold">${isPaymentEditMode ? '완료' : '편집/정렬'}</span>
     </button>
   `;
 
   grid.innerHTML = itemsHtml + addBtn + editToggleBtn;
+
+  // 편집 모드일 때만 꾹 눌러서 드래그 정렬 활성화
+  if (isPaymentEditMode && window.Sortable) {
+    paymentSortableInstance = new Sortable(grid, {
+      draggable: '.payment-sortable-item', // 카드 아이템만 이동 가능
+      animation: 200,
+      delay: 150, // 모바일 롱프레스 딜레이
+      delayOnTouchOnly: true,
+      onEnd: function () {
+        const itemEls = grid.querySelectorAll('.payment-sortable-item');
+        const newPayments = [];
+        itemEls.forEach(el => {
+          const originalIdx = parseInt(el.getAttribute('data-id'));
+          newPayments.push(payments[originalIdx]);
+        });
+        payments = newPayments;
+        localStorage.setItem('my_payments', JSON.stringify(payments));
+        syncToFirebase();
+        renderPayments();
+      }
+    });
+  }
 }
 
     function deletePayment(index, event) {
