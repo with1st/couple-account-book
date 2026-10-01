@@ -40,10 +40,27 @@
 
         <div class="flex items-center gap-1">
           <button onclick="changeMonth(1)" class="p-2 text-gray-500 font-bold">&gt;</button>
-          <button onclick="openSyncModal()" class="p-2 text-gray-600 hover:text-teal-600" title="동기화 설정">🔗</button>
-          <button onclick="openStatsScreen()" class="p-2 text-gray-600 hover:text-teal-600" title="통계">📊</button>
-          <button onclick="openSearchScreen()" class="p-2 text-gray-600 hover:text-teal-600" title="검색">🔍</button>
         </div>
+        <!-- 상단 우측 버튼 그룹: 동기화 / 통계 / 검색 -->
+<div class="flex items-center gap-3">
+  <!-- 동기화 버튼 -->
+  <button onclick="openSyncModal()" class="flex flex-col items-center justify-center text-gray-600 hover:text-teal-600 active:scale-95 transition-transform">
+    <span class="text-lg leading-none">🔗</span>
+    <span class="text-[10px] font-medium text-gray-500 mt-0.5">동기화</span>
+  </button>
+
+  <!-- 통계 버튼 -->
+  <button onclick="openStatsScreen()" class="flex flex-col items-center justify-center text-gray-600 hover:text-teal-600 active:scale-95 transition-transform">
+    <span class="text-lg leading-none">📊</span>
+    <span class="text-[10px] font-medium text-gray-500 mt-0.5">통계</span>
+  </button>
+
+  <!-- 검색 버튼 -->
+  <button onclick="openSearchScreen()" class="flex flex-col items-center justify-center text-gray-600 hover:text-teal-600 active:scale-95 transition-transform">
+    <span class="text-lg leading-none">🔍</span>
+    <span class="text-[10px] font-medium text-gray-500 mt-0.5">검색</span>
+  </button>
+</div>
       </header>
 
       <div class="p-4 bg-white m-4 rounded-2xl border flex justify-around text-center text-sm shadow-sm">
