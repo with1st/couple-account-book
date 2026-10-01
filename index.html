@@ -968,7 +968,59 @@ function renderUsers() {
       form.amount = amt;
       goToStep(5);
     }
+let isCategoryDeleteMode = false;
 
+function toggleCategoryDeleteMode() {
+  isCategoryDeleteMode = !isCategoryDeleteMode;
+  renderCategories();
+}
+
+function renderCategories() {
+  const grid = document.getElementById('categoryGrid');
+  if (!grid) return;
+
+  let itemsHtml = '';
+
+  categories.forEach((c, idx) => {
+    const deleteBtn = isCategoryDeleteMode 
+      ? `<button onclick="deleteCategory(${idx}, event)" class="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center shadow-md z-10 font-bold">✕</button>` 
+      : '';
+
+    const clickAction = isCategoryDeleteMode 
+      ? `deleteCategory(${idx}, event)` 
+      : `selectCategory('${c.name}')`;
+
+    const borderStyle = isCategoryDeleteMode 
+      ? 'border-red-200 bg-red-50/30' 
+      : 'border-gray-200 bg-white';
+
+    itemsHtml += `
+      <div class="relative group">
+        ${deleteBtn}
+        <button onclick="${clickAction}" class="w-full p-3 rounded-2xl flex flex-col items-center justify-center gap-1 border ${borderStyle}">
+          <span class="text-2xl">${c.icon}</span>
+          <span class="text-xs font-bold text-gray-700">${c.name}</span>
+        </button>
+      </div>
+    `;
+  });
+
+  const addBtn = `
+    <button onclick="openModal('category')" class="p-3 bg-gray-100 border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center">
+      <span class="text-xl text-gray-400">+</span>
+      <span class="text-xs font-bold text-gray-500">추가</span>
+    </button>
+  `;
+
+  const deleteToggleBtn = `
+    <button onclick="toggleCategoryDeleteMode()" class="p-3 ${isCategoryDeleteMode ? 'bg-teal-50 border-2 border-teal-400 text-teal-600' : 'bg-red-50 border-2 border-dashed border-red-200 text-red-500'} rounded-2xl flex flex-col items-center justify-center">
+      <span class="text-xl font-bold">${isCategoryDeleteMode ? '✓' : '-'}</span>
+      <span class="text-xs font-bold">${isCategoryDeleteMode ? '완료' : '삭제'}</span>
+    </button>
+  `;
+
+  grid.innerHTML = itemsHtml + addBtn + deleteToggleBtn;
+}
     
 
     function deleteCategory(index, event) {
