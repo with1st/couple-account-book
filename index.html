@@ -18,6 +18,7 @@
 
   <!-- CryptoJS 암호화 라이브러리 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <style>
   input, select, textarea {
     font-size: 16px !important;
@@ -938,30 +939,44 @@ function moveUserOrder(idx, direction, event) {
   renderUsers();
 }
 
+let isUserDeleteMode = false;
+let userSortableInstance = null;
+
+function toggleUserDeleteMode() {
+  isUserDeleteMode = !isUserDeleteMode;
+  renderUsers();
+}
+
 function renderUsers() {
   const grid = document.getElementById('userGrid');
   if (!grid) return;
 
+  // 기존 드래그 인스턴스 초기화
+  if (userSortableInstance) {
+    userSortableInstance.destroy();
+    userSortableInstance = null;
+  }
+
   let itemsHtml = '';
 
   users.forEach((u, idx) => {
-    const editControls = isUserDeleteMode ? `
-      <div class="absolute -top-2 right-1 flex items-center gap-1 z-10">
-        ${idx > 0 ? `<button onclick="moveUserOrder(${idx}, -1, event)" class="bg-gray-700 text-white rounded-full w-5 h-5 text-[10px] flex items-center justify-center shadow">◀</button>` : ''}
-        ${idx < users.length - 1 ? `<button onclick="moveUserOrder(${idx}, 1, event)" class="bg-gray-700 text-white rounded-full w-5 h-5 text-[10px] flex items-center justify-center shadow">▶</button>` : ''}
-        <button onclick="deleteUser(${idx}, event)" class="bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center shadow font-bold ml-0.5">✕</button>
-      </div>
+    // 편집 모드일 때만 널찍한 빨간 X 삭제 버튼 노출 (화살표 제거)
+    const deleteBtn = isUserDeleteMode ? `
+      <button onclick="deleteUser(${idx}, event)" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs flex items-center justify-center shadow-md z-20 font-bold">✕</button>
     ` : '';
 
     const clickAction = isUserDeleteMode ? '' : `selectUser('${u.name}')`;
-    const borderStyle = isUserDeleteMode ? 'border-indigo-200 bg-indigo-50/20' : 'border-gray-200 bg-white active:bg-gray-50';
+    const borderStyle = isUserDeleteMode 
+      ? 'border-2 border-teal-400 bg-teal-50/20 shadow' 
+      : 'border-gray-200 bg-white active:bg-gray-50';
 
     itemsHtml += `
-      <div class="relative group">
-        ${editControls}
-        <button onclick="${clickAction}" class="w-full p-4 rounded-2xl flex flex-col items-center justify-center border shadow-sm ${borderStyle}">
-          <span class="text-3xl">${u.icon}</span>
-          <span class="font-bold text-sm text-gray-700">${u.name}</span>
+      <div class="relative select-none user-sortable-item" data-id="${idx}">
+        ${deleteBtn}
+        <button onclick="${clickAction}" class="w-full p-4 rounded-2xl flex flex-col items-center justify-center border ${borderStyle}">
+          <span class="text-3xl pointer-events-none">${u.icon}</span>
+          <span class="font-bold text-sm text-gray-700 pointer-events-none mt-1">${u.name}</span>
+          ${isUserDeleteMode ? '<span class="text-[10px] text-teal-600 font-medium mt-1 pointer-events-none">꾹 눌러 이동</span>' : ''}
         </button>
       </div>
     `;
@@ -975,13 +990,35 @@ function renderUsers() {
   `;
 
   const editToggleBtn = `
-    <button onclick="toggleUserDeleteMode()" class="p-4 ${isUserDeleteMode ? 'bg-teal-50 border-2 border-teal-400 text-teal-600' : 'bg-gray-50 border-2 border-dashed border-gray-300 text-gray-500'} rounded-2xl flex flex-col items-center justify-center">
-      <span class="text-sm font-bold">${isUserDeleteMode ? '✓' : '⚙️'}</span>
-      <span class="text-xs font-bold">${isUserDeleteMode ? '완료' : '편집/정렬'}</span>
+    <button onclick="toggleUserDeleteMode()" class="p-4 ${isUserDeleteMode ? 'bg-teal-500 text-white shadow-md' : 'bg-gray-50 border-2 border-dashed border-gray-300 text-gray-500'} rounded-2xl flex flex-col items-center justify-center">
+      <span class="text-base font-bold">${isUserDeleteMode ? '✓' : '⚙️'}</span>
+      <span class="text-xs font-bold mt-1">${isUserDeleteMode ? '완료' : '편집/정렬'}</span>
     </button>
   `;
 
   grid.innerHTML = itemsHtml + addBtn + editToggleBtn;
+
+  // 편집 모드일 때만 꾹 눌러서 드래그 정렬 활성화
+  if (isUserDeleteMode && window.Sortable) {
+    userSortableInstance = new Sortable(grid, {
+      draggable: '.user-sortable-item', // 추가/완료 버튼은 고정되고 카드들만 이동
+      animation: 200,
+      delay: 150, // 모바일 스크롤 터치와 겹치지 않게 살짝 꾹 눌렀을 때 반응
+      delayOnTouchOnly: true,
+      onEnd: function () {
+        const itemEls = grid.querySelectorAll('.user-sortable-item');
+        const newUsers = [];
+        itemEls.forEach(el => {
+          const originalIdx = parseInt(el.getAttribute('data-id'));
+          newUsers.push(users[originalIdx]);
+        });
+        users = newUsers;
+        localStorage.setItem('my_users', JSON.stringify(users));
+        syncToFirebase();
+        renderUsers(); // 인덱스 및 위치 갱신
+      }
+    });
+  }
 }
 
     function deleteUser(index, event) {
