@@ -178,6 +178,7 @@
       <h3 class="font-bold text-sm text-gray-800 mb-3">최근 6개월 추이</h3>
       <div id="sixMonthBarChart" class="flex justify-between items-end h-32 pt-6 px-2 border-b"></div>
     </div>
+    <div id="smartInsightContainer" class="mt-4 mb-4"></div>
   </div>
 
   <!-- 검색 화면 -->
@@ -655,7 +656,201 @@
       renderGroupStats('category', filtered, totalSum, categories, 'catBarChart', 'catStatList');
       renderGroupStats('user', filtered, totalSum, users, 'userBarChart', 'userStatList');
       renderGroupStats('payment', filtered, totalSum, payments, 'payBarChart', 'payStatList');
+      // 최하단 스마트 인사이트 리포트 렌더링
+      renderSmartInsights(year, month + 1);
     }
+
+    // 통계 최하단 종합 스마트 지출 분석 함수 (최대 5개 선별 브리핑)
+function renderSmartInsights(year, month) {
+  const container = document.getElementById('smartInsightContainer');
+  if (!container) return;
+
+  const curYear = parseInt(year);
+  const curMonth = parseInt(month);
+
+  const pad = n => String(n).padStart(2, '0');
+  const curPrefix = `${curYear}-${pad(curMonth)}`;
+
+  let prevYear = curYear;
+  let prevMonth = curMonth - 1;
+  if (prevMonth === 0) {
+    prevMonth = 12;
+    prevYear -= 1;
+  }
+  const prevPrefix = `${prevYear}-${pad(prevMonth)}`;
+  const lastYearPrefix = `${curYear - 1}-${pad(curMonth)}`;
+
+  // 지출 내역 필터링
+  const curList = expenses.filter(e => e.type !== '수입' && e.type !== 'income' && e.date.startsWith(curPrefix));
+  const prevList = expenses.filter(e => e.type !== '수입' && e.type !== 'income' && e.date.startsWith(prevPrefix));
+  const lastYearList = expenses.filter(e => e.type !== '수입' && e.type !== 'income' && e.date.startsWith(lastYearPrefix));
+
+  const curTotal = curList.reduce((acc, e) => acc + Number(e.amount), 0);
+  const prevTotal = prevList.reduce((acc, e) => acc + Number(e.amount), 0);
+  const lastYearTotal = lastYearList.reduce((acc, e) => acc + Number(e.amount), 0);
+
+  if (curList.length === 0) {
+    container.innerHTML = `
+      <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 text-center text-xs text-gray-500">
+        📝 이번 달 지출 내역이 등록되면 종합 분석 리포트가 표시됩니다.
+      </div>`;
+    return;
+  }
+
+  const getCatMap = list => {
+    const map = {};
+    list.forEach(e => { map[e.category] = (map[e.category] || 0) + Number(e.amount); });
+    return map;
+  };
+  const curCatMap = getCatMap(curList);
+  const prevCatMap = getCatMap(prevList);
+  const lastYearCatMap = getCatMap(lastYearList);
+
+  const userMap = {};
+  curList.forEach(e => {
+    const u = e.user || '공동';
+    userMap[u] = (userMap[u] || 0) + Number(e.amount);
+  });
+
+  const candidates = [];
+
+  // 1. 총지출 지난달 대비 증감 요약
+  if (prevTotal > 0) {
+    const diff = curTotal - prevTotal;
+    const rate = Math.round((diff / prevTotal) * 100);
+    if (diff > 0) {
+      candidates.push({
+        priority: 1,
+        icon: '⚠️',
+        text: `지난달(${prevMonth}월) 대비 총 <b>${diff.toLocaleString()}원 (+${rate}%)</b> 더 지출 중입니다.`
+      });
+    } else if (diff < 0) {
+      candidates.push({
+        priority: 1,
+        icon: '🎉',
+        text: `지난달(${prevMonth}월) 대비 총 <b>${Math.abs(diff).toLocaleString()}원 (${rate}%)</b> 절약하고 있습니다!`
+      });
+    }
+  }
+
+  // 2. 카테고리별 최대 증가 / 최대 절약 항목
+  if (prevTotal > 0) {
+    const allCats = Array.from(new Set([...Object.keys(curCatMap), ...Object.keys(prevCatMap)]));
+    let maxIncCat = null, maxIncAmt = 0;
+    let maxDecCat = null, maxDecAmt = 0;
+
+    allCats.forEach(cat => {
+      const diff = (curCatMap[cat] || 0) - (prevCatMap[cat] || 0);
+      if (diff > maxIncAmt) { maxIncAmt = diff; maxIncCat = cat; }
+      if (diff < maxDecAmt) { maxDecAmt = diff; maxDecCat = cat; }
+    });
+
+    if (maxIncCat && maxIncAmt >= 10000) {
+      candidates.push({
+        priority: 2,
+        icon: '📈',
+        text: `<b>${maxIncCat}</b> 지출이 지난달보다 <b>+${maxIncAmt.toLocaleString()}원</b>으로 가장 많이 늘었습니다.`
+      });
+    }
+    if (maxDecCat && Math.abs(maxDecAmt) >= 10000) {
+      candidates.push({
+        priority: 3,
+        icon: '👏',
+        text: `<b>${maxDecCat}</b> 항목을 지난달보다 <b>-${Math.abs(maxDecAmt).toLocaleString()}원</b> 절약해 방어했습니다.`
+      });
+    }
+  }
+
+  // 3. 작년 동월(YoY) 비교
+  if (lastYearTotal > 0) {
+    let yoyDiffCat = null, yoyMaxDiff = 0;
+    Object.keys(curCatMap).forEach(cat => {
+      const prevYearAmt = lastYearCatMap[cat] || 0;
+      if (prevYearAmt > 0) {
+        const diff = curCatMap[cat] - prevYearAmt;
+        if (Math.abs(diff) > Math.abs(yoyMaxDiff)) {
+          yoyMaxDiff = diff;
+          yoyDiffCat = cat;
+        }
+      }
+    });
+
+    if (yoyDiffCat && Math.abs(yoyMaxDiff) >= 20000) {
+      const sign = yoyMaxDiff > 0 ? `+${yoyMaxDiff.toLocaleString()}원 증가` : `-${Math.abs(yoyMaxDiff).toLocaleString()}원 감소`;
+      candidates.push({
+        priority: 4,
+        icon: '🗓️',
+        text: `작년 ${curMonth}월과 비교했을 때 <b>${yoyDiffCat}</b> 지출이 <b>${sign}</b>했습니다.`
+      });
+    }
+  }
+
+  // 4. 월말 예상 페이스
+  const now = new Date();
+  if (now.getFullYear() === curYear && (now.getMonth() + 1) === curMonth) {
+    const todayDate = now.getDate();
+    const lastDayOfMonth = new Date(curYear, curMonth, 0).getDate();
+    if (todayDate >= 3) {
+      const dailyAvg = Math.round(curTotal / todayDate);
+      const expectedTotal = dailyAvg * lastDayOfMonth;
+      candidates.push({
+        priority: 5,
+        icon: '⏱️',
+        text: `현재 일평균 <b>${dailyAvg.toLocaleString()}원</b> 페이스이며, 월말 예상치는 <b>약 ${Math.round(expectedTotal / 10000)}만 원</b>입니다.`
+      });
+    }
+  }
+
+  // 5. 최대 비중 카테고리
+  let topCat = null, topCatAmt = 0;
+  Object.entries(curCatMap).forEach(([cat, amt]) => {
+    if (amt > topCatAmt) { topCatAmt = amt; topCat = cat; }
+  });
+  if (topCat && curTotal > 0) {
+    const percent = Math.round((topCatAmt / curTotal) * 100);
+    candidates.push({
+      priority: 6,
+      icon: '💳',
+      text: `이번 달 최대 지출 분야는 <b>${topCat}</b>이며 전체의 <b>${percent}%</b>를 차지합니다.`
+    });
+  }
+
+  // 6. 사용자별 지출 비중
+  const users = Object.keys(userMap);
+  if (users.length >= 2 && curTotal > 0) {
+    const breakdown = users.map(u => `${u} ${Math.round((userMap[u] / curTotal) * 100)}%`).join(' : ');
+    candidates.push({
+      priority: 7,
+      icon: '👥',
+      text: `지출자 비중은 <b>${breakdown}</b>로 집계되었습니다.`
+    });
+  }
+
+  const topInsights = candidates
+    .sort((a, b) => a.priority - b.priority)
+    .slice(0, 5);
+
+  container.innerHTML = `
+    <div class="bg-gradient-to-br from-teal-50/70 via-white to-indigo-50/50 border border-teal-100 rounded-2xl p-4 shadow-sm">
+      <div class="flex items-center justify-between border-b border-teal-100/70 pb-2 mb-3">
+        <div class="flex items-center gap-1.5 font-bold text-gray-800 text-sm">
+          <span>💡</span> <span>${curMonth}월 지출 총평 & 인사이트</span>
+        </div>
+        <span class="text-[11px] font-semibold text-teal-600 bg-white px-2 py-0.5 rounded-full border border-teal-200">
+          핵심 요약
+        </span>
+      </div>
+      <div class="space-y-2">
+        ${topInsights.map(item => `
+          <div class="flex items-start gap-2 text-xs text-gray-700 leading-relaxed">
+            <span class="text-sm shrink-0 mt-0.5">${item.icon}</span>
+            <span>${item.text}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
 
     function renderGroupStats(key, items, totalSum, metaList, barChartId, listId) {
       const groupMap = {};
