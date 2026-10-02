@@ -553,9 +553,6 @@ let selectedDateStr = getTodayStr();
       document.getElementById('statsStep').classList.add('hidden');
       document.getElementById(`step${step}`).classList.remove('hidden');
 
-      if (step === 2) {
-      selectedDateStr = getTodayStr();
-    }
       if (step === 2) renderUsers();
       if (step === 5) renderCategories();
       if (step === 6) renderPayments();
@@ -1574,6 +1571,10 @@ function renderPayments() {
       document.getElementById('inputAmount').value = '';
       document.getElementById('inputMemo').value = '';
 
+      // 등록 완료 후 달력 선택 날짜를 다시 오늘 날짜로 초기화
+    currentDate = new Date();
+    selectedDateStr = getTodayStr();
+    
       renderCalendar();
       renderDayExpenses();
       goToStep(1);
