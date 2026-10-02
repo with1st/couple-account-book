@@ -382,7 +382,11 @@
     let activeRef = null; // 현재 Firebase 리스너 참도
 
     let currentDate = new Date();
-    let selectedDateStr = new Date().toISOString().substring(0, 10);
+    const getTodayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+let selectedDateStr = getTodayStr();
     let expenses = JSON.parse(localStorage.getItem('my_expenses') || '[]');
 
     let form = { user: '', type: '지출', amount: 0, memo: '', category: '', payment: '' };
@@ -549,6 +553,9 @@
       document.getElementById('statsStep').classList.add('hidden');
       document.getElementById(`step${step}`).classList.remove('hidden');
 
+      if (step === 2) {
+      selectedDateStr = getTodayStr();
+    }
       if (step === 2) renderUsers();
       if (step === 5) renderCategories();
       if (step === 6) renderPayments();
